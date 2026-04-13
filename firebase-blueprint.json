@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile and settings for the app.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "adhdMode": { "type": "boolean" },
+            "notificationsEnabled": { "type": "boolean" },
+            "onboardingCompleted": { "type": "boolean" },
+            "workDays": { "type": "array", "items": { "type": "string" } },
+            "workStart": { "type": "string" },
+            "workEnd": { "type": "string" },
+            "commuteToWork": { "type": "integer" },
+            "commuteToHome": { "type": "integer" },
+            "lunchDuration": { "type": "integer" },
+            "routines": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "title": { "type": "string" },
+                  "days": { "type": "array", "items": { "type": "string" } },
+                  "startTime": { "type": "string" },
+                  "duration": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "stats": {
+          "type": "object",
+          "properties": {
+            "points": { "type": "integer" },
+            "streak": { "type": "integer" },
+            "completedMilestones": { "type": "integer" },
+            "totalMilestones": { "type": "integer" }
+          }
+        }
+      },
+      "required": ["uid", "email", "displayName"]
+    },
+    "DailyPlan": {
+      "title": "Daily Plan",
+      "description": "A plan for a specific day.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "active", "completed"] },
+        "summary": { "type": "string" }
+      },
+      "required": ["id", "userId", "date", "status"]
+    },
+    "Milestone": {
+      "title": "Milestone",
+      "description": "An actionable item within a daily plan.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "planId": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["fixed", "flexible", "transition", "preparation"] },
+        "status": { "type": "string", "enum": ["pending", "completed", "skipped", "delayed"] },
+        "isActionable": { "type": "boolean" },
+        "order": { "type": "integer" }
+      },
+      "required": ["id", "planId", "userId", "title", "startTime", "endTime", "type", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile data."
+    },
+    "/users/{userId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chat history for the user."
+    },
+    "/plans/{planId}": {
+      "schema": "DailyPlan",
+      "description": "Daily plans."
+    },
+    "/plans/{planId}/milestones/{milestoneId}": {
+      "schema": "Milestone",
+      "description": "Milestones for a specific plan."
+    }
+  }
+}

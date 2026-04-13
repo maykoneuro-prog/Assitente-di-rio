@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (required)
+    //   - photoURL: string (optional)
+    //   - settings: map (adhdMode: bool, notificationsEnabled: bool, onboardingCompleted: bool, workDays: list, workStart: string, workEnd: string, commuteToWork: int, commuteToHome: int, lunchDuration: int, routines: list)
+    //   - stats: map (points: int, streak: int, completedMilestones: int, totalMilestones: int)
+    //
+    // Collection: messages (subcollection of users)
+    // Document ID: {messageId}
+    // Fields:
+    //   - id: string
+    //   - role: string (user/model)
+    //   - content: string
+    //   - timestamp: int
+    //
+    // Collection: plans
+    // Document ID: {planId}
+    // Fields:
+    //   - id: string (required)
+    //   - userId: string (required)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - status: string (required, enum: draft, active, completed)
+    //   - summary: string (optional)
+    //
+    // Collection: milestones (subcollection of plans)
+    // Document ID: {milestoneId}
+    // Fields:
+    //   - id: string (required)
+    //   - planId: string (required)
+    //   - userId: string (required)
+    //   - title: string (required)
+    //   - description: string (optional)
+    //   - startTime: string (required, ISO)
+    //   - endTime: string (required, ISO)
+    //   - type: string (required, enum: fixed, flexible, transition, preparation)
+    //   - status: string (required, enum: pending, completed, skipped, delayed)
+    //   - isActionable: bool (required)
+    //   - order: int (required)
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "maykon.euro@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDate(date) {
+      return date is string && date.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    function isValidDateTime(dateTime) {
+      return dateTime is string && dateTime.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Validation Functions
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.displayName is string && data.displayName.size() < 100;
+    }
+
+    function isValidPlan(data) {
+      return data.keys().hasAll(['id', 'userId', 'date', 'status']) &&
+             data.userId == request.auth.uid &&
+             isValidDate(data.date) &&
+             data.status in ['draft', 'active', 'completed'];
+    }
+
+    function isValidMilestone(data) {
+      return data.keys().hasAll(['id', 'planId', 'userId', 'title', 'startTime', 'endTime', 'type', 'status']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() < 200 &&
+             isValidDateTime(data.startTime) &&
+             isValidDateTime(data.endTime) &&
+             data.type in ['fixed', 'flexible', 'transition', 'preparation'] &&
+             data.status in ['pending', 'completed', 'skipped', 'delayed'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+
+      match /messages/{messageId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+      }
+    }
+
+    match /plans/{planId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidPlan(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidPlan(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      match /milestones/{milestoneId} {
+        allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+        allow create: if isAuthenticated() && isValidMilestone(request.resource.data);
+        allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidMilestone(request.resource.data);
+        allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      }
+    }
+  }
+}

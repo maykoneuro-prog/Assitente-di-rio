@@ -1,0 +1,6 @@
+{
+  "name": "Tempo Amigo",
+  "description": "Assistente diário inteligente para orquestração de tempo, focado em TDAH e organização pessoal.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": []
+}
