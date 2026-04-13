@@ -17,10 +17,11 @@ import {
   where,
   updateDoc,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  getDocs
 } from 'firebase/firestore';
 import { UserProfile, DailyPlan, Milestone, ChatMessage, Routine } from './types';
-import { orchestrateDay } from './services/geminiService';
+import { orchestrateDay, generateInitialPlan } from './services/geminiService';
 import { ChatInput } from './components/ChatInput';
 import { Timeline } from './components/Timeline';
 import { ChatBubble } from './components/ChatBubble';
@@ -50,6 +51,7 @@ export default function App() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -58,86 +60,93 @@ export default function App() {
 
   // Push Notifications Setup
   useEffect(() => {
-    if (user && messaging) {
+    if (user) {
       const requestPermission = async () => {
         try {
+          const m = await messaging;
+          if (!m) return;
+
           const permission = await Notification.requestPermission();
           if (permission === 'granted') {
-            const token = await getToken(messaging, {
+            const token = await getToken(m, {
               vapidKey: 'YOUR_PUBLIC_VAPID_KEY_HERE' // User needs to replace this
             });
             if (token) {
               console.log('FCM Token:', token);
-              // Save token to user profile if needed for server-side pushes
               await updateDoc(doc(db, 'users', user.uid), {
                 fcmToken: token
               });
             }
           }
+
+          const unsubscribe = onMessage(m, (payload) => {
+            console.log('Message received in foreground:', payload);
+          });
+          return unsubscribe;
         } catch (error) {
           console.error('Error getting notification permission:', error);
         }
       };
 
-      requestPermission();
-
-      const unsubscribe = onMessage(messaging, (payload) => {
-        console.log('Message received in foreground:', payload);
-        // You could show a custom toast here
-      });
-
-      return () => unsubscribe();
+      const unsubPromise = requestPermission();
+      return () => {
+        unsubPromise.then(unsub => unsub?.());
+      };
     }
   }, [user]);
 
-  // Auth Listener
+  // Auth & Data Listener
   useEffect(() => {
-    return onAuthStateChanged(auth, async (u) => {
+    let unsubProfile: (() => void) | null = null;
+    let unsubPlan: (() => void) | null = null;
+    let unsubMilestones: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      setIsAuthLoading(false);
+      
+      // Cleanup previous listeners
+      unsubProfile?.();
+      unsubPlan?.();
+      unsubMilestones?.();
+
       if (u) {
         // Load or create profile
         const profileRef = doc(db, 'users', u.uid);
-        const profileSnap = await getDoc(profileRef);
-        
-        if (!profileSnap.exists()) {
-          const newProfile: UserProfile = {
-            uid: u.uid,
-            email: u.email!,
-            displayName: u.displayName!,
-            photoURL: u.photoURL || undefined,
-            settings: {
-              adhdMode: true,
-              notificationsEnabled: true,
-              onboardingCompleted: false,
-              workDays: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'],
-              workStart: '09:00',
-              workEnd: '18:00',
-              commuteToWork: 30,
-              commuteToHome: 30,
-              lunchDuration: 60,
-              routines: []
-            },
-            stats: {
-              points: 0,
-              streak: 0,
-              completedMilestones: 0,
-              totalMilestones: 0
-            }
-          };
-          await setDoc(profileRef, newProfile);
-          setProfile(newProfile);
-        } else {
-          setProfile(profileSnap.data() as UserProfile);
-        }
+        unsubProfile = onSnapshot(profileRef, (snap) => {
+          if (snap.exists()) {
+            setProfile(snap.data() as UserProfile);
+          } else {
+            // Create initial profile if missing
+            const newProfile: UserProfile = {
+              uid: u.uid,
+              email: u.email!,
+              displayName: u.displayName!,
+              photoURL: u.photoURL || undefined,
+              settings: {
+                adhdMode: true,
+                notificationsEnabled: true,
+                onboardingCompleted: false,
+                workDays: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'],
+                workStart: '09:00',
+                workEnd: '18:00',
+                commuteToWork: 30,
+                commuteToHome: 30,
+                lunchDuration: 60,
+                routines: []
+              },
+              stats: { points: 0, streak: 0, completedMilestones: 0, totalMilestones: 0 }
+            };
+            setDoc(profileRef, newProfile);
+          }
+        });
 
         // Load chat history
         const messagesRef = collection(db, 'users', u.uid, 'messages');
         const msgQuery = query(messagesRef, orderBy('timestamp', 'asc'), limit(50));
         onSnapshot(msgQuery, (snapshot) => {
           const msgs = snapshot.docs.map(doc => doc.data() as ChatMessage);
-          if (msgs.length > 0) {
-            setMessages(msgs);
-          }
+          if (msgs.length > 0) setMessages(msgs);
         });
 
         // Load today's plan
@@ -145,7 +154,9 @@ export default function App() {
         const plansRef = collection(db, 'plans');
         const q = query(plansRef, where('userId', '==', u.uid), where('date', '==', today));
         
-        onSnapshot(q, (snapshot) => {
+        unsubPlan = onSnapshot(q, (snapshot) => {
+          unsubMilestones?.(); // Cleanup old milestone listener
+          
           if (!snapshot.empty) {
             const planDoc = snapshot.docs[0];
             const planData = planDoc.data() as DailyPlan;
@@ -153,23 +164,32 @@ export default function App() {
 
             // Load milestones
             const milestonesRef = collection(db, 'plans', planDoc.id, 'milestones');
-            onSnapshot(milestonesRef, (mSnap) => {
+            unsubMilestones = onSnapshot(milestonesRef, (mSnap) => {
               const mData = mSnap.docs.map(doc => doc.data() as Milestone);
               setMilestones(mData);
             });
           } else {
+            setCurrentPlan(null);
+            setMilestones([]);
             // New day, show welcome message
-            setMessages([{
+            setMessages(prev => prev.length === 0 ? [{
               id: 'welcome',
               role: 'model',
               content: "Bom dia! Sou o Organiza.ai. O que temos para hoje? Pode me contar tudo o que você lembra, sem pressa e sem ordem.",
               timestamp: Date.now()
-            }]);
+            }] : prev);
             setView('chat');
           }
         });
       }
     });
+
+    return () => {
+      unsubAuth();
+      unsubProfile?.();
+      unsubPlan?.();
+      unsubMilestones?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -204,6 +224,80 @@ export default function App() {
       setView('timeline');
     } catch (error) {
       console.error("Error resetting profile:", error);
+    }
+  };
+
+  const processAIResponse = async (response: any) => {
+    if (!user || !profile) {
+      console.warn("processAIResponse: missing user or profile");
+      return;
+    }
+
+    console.log("Processing AI response with milestones:", response.suggestedMilestones?.length);
+
+    if (response.suggestedMilestones && response.suggestedMilestones.length > 0) {
+      try {
+        // Create or update plan
+        let planId = currentPlan?.id;
+        const today = format(new Date(), 'yyyy-MM-dd');
+
+        if (!planId) {
+          console.log("Creating new plan for today:", today);
+          const newPlanRef = await addDoc(collection(db, 'plans'), {
+            userId: user.uid,
+            date: today,
+            status: 'draft',
+            createdAt: serverTimestamp()
+          });
+          planId = newPlanRef.id;
+          await updateDoc(newPlanRef, { id: planId });
+        } else {
+          console.log("Updating existing plan:", planId);
+          // If plan exists, clean up old milestones to avoid duplicates
+          const oldMilestonesRef = collection(db, 'plans', planId, 'milestones');
+          const oldSnap = await getDocs(oldMilestonesRef);
+          const deletePromises = oldSnap.docs.map(d => deleteDoc(d.ref));
+          await Promise.all(deletePromises);
+        }
+
+        // Add milestones
+        const milestonesRef = collection(db, 'plans', planId!, 'milestones');
+        for (const m of response.suggestedMilestones) {
+          const newMRef = doc(milestonesRef);
+          const newMilestone: Milestone = {
+            id: newMRef.id,
+            planId: planId!,
+            userId: user.uid,
+            title: m.title || 'Sem título',
+            description: m.description || '',
+            startTime: m.startTime || new Date().toISOString(),
+            endTime: m.endTime || new Date().toISOString(),
+            type: m.type || 'flexible',
+            status: 'pending',
+            isActionable: true,
+            order: milestones.length
+          };
+          await setDoc(newMRef, newMilestone);
+        }
+        
+        console.log("Successfully added milestones to plan:", planId);
+
+        // If it was a "Carga Inicial" or major update, maybe switch back to timeline
+        if (response.isPlanComplete) {
+          setTimeout(() => setView('timeline'), 1500);
+        }
+      } catch (err) {
+        console.error("Error in processAIResponse:", err);
+        const errorMsg: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'model',
+          content: "Tive um erro técnico ao salvar seu plano no banco de dados. Por favor, tente novamente em alguns instantes.",
+          timestamp: Date.now()
+        };
+        setMessages(prev => [...prev, errorMsg]);
+      }
+    } else {
+      console.warn("processAIResponse: No milestones found in response");
     }
   };
 
@@ -269,46 +363,7 @@ export default function App() {
         console.log("End of Day Summary:", response.summary);
       }
 
-      if (response.suggestedMilestones && response.suggestedMilestones.length > 0) {
-        // Create or update plan
-        let planId = currentPlan?.id;
-        if (!planId) {
-          const today = format(new Date(), 'yyyy-MM-dd');
-          const newPlanRef = await addDoc(collection(db, 'plans'), {
-            userId: user.uid,
-            date: today,
-            status: 'draft',
-            createdAt: serverTimestamp()
-          });
-          planId = newPlanRef.id;
-          await updateDoc(newPlanRef, { id: planId });
-        }
-
-        // Add milestones
-        const milestonesRef = collection(db, 'plans', planId, 'milestones');
-        for (const m of response.suggestedMilestones) {
-          const newMRef = doc(milestonesRef);
-          const newMilestone: Milestone = {
-            id: newMRef.id,
-            planId: planId,
-            userId: user.uid,
-            title: m.title || 'Sem título',
-            description: m.description,
-            startTime: m.startTime || new Date().toISOString(),
-            endTime: m.endTime || new Date().toISOString(),
-            type: m.type || 'flexible',
-            status: 'pending',
-            isActionable: true,
-            order: milestones.length
-          };
-          await setDoc(newMRef, newMilestone);
-        }
-        
-        // If it was a "Carga Inicial" or major update, maybe switch back to timeline
-        if (response.isPlanComplete) {
-          setTimeout(() => setView('timeline'), 2000);
-        }
-      }
+      await processAIResponse(response);
     } catch (error) {
       console.error(error);
     } finally {
@@ -337,12 +392,61 @@ export default function App() {
   };
 
   const completeOnboarding = async (settings: UserProfile['settings']) => {
-    if (!user) return;
-    const pRef = doc(db, 'users', user.uid);
-    await updateDoc(pRef, { settings });
-    setProfile(prev => prev ? { ...prev, settings } : null);
-    setIsEditingProfile(false);
+    if (!user) {
+      console.error("No user found during onboarding completion");
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const pRef = doc(db, 'users', user.uid);
+      await updateDoc(pRef, { 
+        settings,
+        'settings.onboardingCompleted': true 
+      });
+      
+      const updatedProfile = profile ? { 
+        ...profile, 
+        settings: { ...settings, onboardingCompleted: true } 
+      } : null;
+      
+      setProfile(updatedProfile);
+      setIsEditingProfile(false);
+
+      if (updatedProfile) {
+        console.log("Generating initial plan for profile:", updatedProfile.uid);
+        const response = await generateInitialPlan(updatedProfile);
+        
+        const modelMsg: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'model',
+          content: response.message,
+          timestamp: Date.now()
+        };
+        
+        const modelMsgRef = doc(db, 'users', user.uid, 'messages', modelMsg.id);
+        await setDoc(modelMsgRef, modelMsg);
+        setMessages(prev => [...prev, modelMsg]);
+
+        await processAIResponse(response);
+      }
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          className="w-16 h-16 bg-brand-500 rounded-3xl shadow-2xl shadow-brand-200"
+        />
+      </div>
+    );
+  }
 
   if (!user) {
     return (

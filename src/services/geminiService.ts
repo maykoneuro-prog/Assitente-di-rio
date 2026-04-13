@@ -1,11 +1,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Milestone, UserProfile, Routine } from "../types";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 let aiInstance: GoogleGenAI | null = null;
 
 function getAI() {
   if (!aiInstance) {
-    const apiKey = process.env.GEMINI_API_KEY;
+    // Try process.env (Vite define) first, then import.meta.env
+    const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+    
     if (!apiKey) {
       console.warn("GEMINI_API_KEY is missing. AI features will not work until configured.");
       return null;
@@ -56,6 +60,90 @@ export interface OrchestratorResponse {
   needsClarification: boolean;
   summary?: string;
   newRoutine?: Partial<Routine>;
+}
+
+export async function generateInitialPlan(
+  profile: UserProfile
+): Promise<OrchestratorResponse> {
+  const routinesContext = profile.settings.routines.map(r => 
+    `- ${r.title}: ${r.days.join(', ')} às ${r.startTime} (${r.duration} min)`
+  ).join('\n');
+
+  const workContext = `Trabalho: ${profile.settings.workDays.join(', ')} das ${profile.settings.workStart} às ${profile.settings.workEnd}. Deslocamento: ${profile.settings.commuteToWork} min ida, ${profile.settings.commuteToHome} min volta. Almoço: ${profile.settings.lunchDuration} min.`;
+
+  const todayDate = new Date();
+  const todayStr = format(todayDate, 'yyyy-MM-dd');
+  const dayOfWeek = format(todayDate, 'EEE', { locale: ptBR });
+
+  const prompt = `
+O usuário acabou de configurar seu perfil. Por favor, gere um plano inicial para HOJE (${todayStr}, ${dayOfWeek}) baseado nas configurações dele.
+
+CONFIGURAÇÕES:
+${workContext}
+
+ROTINAS FIXAS:
+${routinesContext}
+
+INSTRUÇÕES CRÍTICAS:
+1. Verifique se hoje (${dayOfWeek}) é um dia de trabalho ou se há rotinas para este dia.
+2. Se houver, gere os marcos correspondentes com horários precisos em formato ISO (ex: ${todayStr}T09:00:00Z).
+3. Adicione marcos de PREPARAÇÃO (30 min antes de sair) e DESLOCAMENTO (conforme configurado).
+4. Se for dia de trabalho, inclua o ALMOÇO no meio do período.
+5. Se o dia estiver vazio, sugira 2 atividades de autocuidado (ex: Meditação, Leitura) com horários sugeridos.
+6. A propriedade "startTime" e "endTime" DEVEM ser strings ISO completas para o dia de hoje (${todayStr}).
+7. Defina "isPlanComplete" como true.
+8. Responda com uma mensagem motivadora em "message".
+`;
+
+  const ai = getAI();
+  if (!ai) {
+    return {
+      message: "A chave da API do Gemini não foi configurada.",
+      isPlanComplete: false,
+      needsClarification: true
+    };
+  }
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          message: { type: Type.STRING },
+          suggestedMilestones: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                startTime: { type: Type.STRING },
+                endTime: { type: Type.STRING },
+                type: { type: Type.STRING, enum: ["fixed", "flexible", "transition", "preparation"] },
+                description: { type: Type.STRING }
+              }
+            }
+          },
+          isPlanComplete: { type: Type.BOOLEAN },
+          needsClarification: { type: Type.BOOLEAN }
+        },
+        required: ["message", "isPlanComplete", "needsClarification"]
+      }
+    }
+  });
+
+  try {
+    return JSON.parse(response.text || "{}");
+  } catch (e) {
+    return {
+      message: "Erro ao gerar plano inicial.",
+      isPlanComplete: false,
+      needsClarification: true
+    };
+  }
 }
 
 export async function orchestrateDay(
