@@ -33,11 +33,13 @@ import {
   Settings,
   Trophy, 
   LogOut,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { orderBy, limit } from 'firebase/firestore';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -352,7 +354,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col max-w-md mx-auto relative overflow-hidden shadow-2xl">
+    <ErrorBoundary>
+      <div className="min-h-screen bg-slate-50 flex flex-col max-w-md mx-auto relative overflow-hidden shadow-2xl">
       {/* Header */}
       <header className="p-6 pb-4 glass sticky top-0 z-30 flex items-center justify-between">
         <div>
@@ -458,5 +461,6 @@ export default function App() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
