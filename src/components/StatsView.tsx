@@ -1,15 +1,16 @@
 import React from 'react';
 import { UserProfile } from '../types';
-import { Trophy, Star, Target, Zap, CheckCircle, Sparkles, Settings } from 'lucide-react';
+import { Trophy, Star, Target, Zap, CheckCircle, Sparkles, Settings, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface StatsViewProps {
   profile: UserProfile | null;
   onGenerateSummary: () => void;
   onEditProfile: () => void;
+  onResetProfile: () => void;
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ profile, onGenerateSummary, onEditProfile }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ profile, onGenerateSummary, onEditProfile, onResetProfile }) => {
   if (!profile) return null;
 
   const stats = [
@@ -54,6 +55,14 @@ export const StatsView: React.FC<StatsViewProps> = ({ profile, onGenerateSummary
       >
         <Settings className="w-5 h-5" />
         Ajustar Perfil e Rotinas
+      </button>
+
+      <button
+        onClick={onResetProfile}
+        className="w-full py-4 bg-red-50 border border-red-100 rounded-2xl font-semibold text-red-600 shadow-sm hover:bg-red-100 transition-all flex items-center justify-center gap-3"
+      >
+        <Trash2 className="w-5 h-5" />
+        Esquecer Perfil e Recomeçar
       </button>
 
       <div className="grid grid-cols-2 gap-4">

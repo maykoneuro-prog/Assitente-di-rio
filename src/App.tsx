@@ -38,8 +38,10 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { orderBy, limit } from 'firebase/firestore';
+import { orderBy, limit, deleteDoc } from 'firebase/firestore';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ConfirmationModal } from './components/ConfirmationModal';
+import { SettingsModal } from './components/SettingsModal';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -49,6 +51,8 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [view, setView] = useState<'chat' | 'timeline' | 'stats'>('timeline');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -178,6 +182,30 @@ export default function App() {
   };
 
   const handleLogout = () => auth.signOut();
+
+  const handleResetProfile = async () => {
+    if (!user) return;
+    try {
+      const pRef = doc(db, 'users', user.uid);
+      // Reset settings to trigger onboarding
+      await updateDoc(pRef, {
+        'settings.onboardingCompleted': false,
+        'stats.points': 0,
+        'stats.streak': 0,
+        'stats.completedMilestones': 0,
+        'stats.totalMilestones': 0
+      });
+      setProfile(prev => prev ? { 
+        ...prev, 
+        settings: { ...prev.settings, onboardingCompleted: false },
+        stats: { points: 0, streak: 0, completedMilestones: 0, totalMilestones: 0 }
+      } : null);
+      setIsEditingProfile(true);
+      setView('timeline');
+    } catch (error) {
+      console.error("Error resetting profile:", error);
+    }
+  };
 
   const handleVoiceTranscript = async (text: string) => {
     if (!user || !profile) return;
@@ -404,9 +432,9 @@ export default function App() {
         </div>
         <div className="flex items-center gap-1">
           <button 
-            onClick={() => setIsEditingProfile(true)}
+            onClick={() => setIsSettingsOpen(true)}
             className="p-2 text-slate-400 hover:text-brand-500 transition-colors bg-slate-50 rounded-xl"
-            title="Configurações de Perfil"
+            title="Configurações"
           >
             <Settings className="w-5 h-5" />
           </button>
@@ -414,14 +442,11 @@ export default function App() {
             <Trophy className="w-3 h-3" />
             {profile?.stats.points || 0} pts
           </div>
-          <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors bg-slate-50 rounded-xl">
-            <LogOut className="w-5 h-5" />
-          </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto px-6 pt-4 pb-32 no-scrollbar">
+      <main className={`flex-1 overflow-y-auto pt-4 pb-32 no-scrollbar ${view === 'timeline' ? 'px-0' : 'px-6'}`}>
         <AnimatePresence mode="wait">
           {view === 'timeline' && (
             <motion.div
@@ -465,6 +490,7 @@ export default function App() {
                 profile={profile} 
                 onGenerateSummary={() => handleVoiceTranscript("Gere um resumo do meu dia até agora, por favor.")} 
                 onEditProfile={() => setIsEditingProfile(true)}
+                onResetProfile={() => setIsResetModalOpen(true)}
               />
             </motion.div>
           )}
@@ -498,6 +524,26 @@ export default function App() {
           </nav>
         </div>
       </div>
+      
+      <ConfirmationModal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+        onConfirm={handleResetProfile}
+        title="Recomeçar do Zero?"
+        message="Isso irá resetar suas configurações e pontos. Suas mensagens e planos anteriores não serão apagados, mas você precisará configurar seu perfil novamente."
+        confirmLabel="Sim, Resetar"
+        cancelLabel="Não, Manter"
+        variant="danger"
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onEditProfile={() => setIsEditingProfile(true)}
+        onResetProfile={() => setIsResetModalOpen(true)}
+        onLogout={handleLogout}
+        userEmail={user?.email || ''}
+      />
     </div>
     </ErrorBoundary>
   );
