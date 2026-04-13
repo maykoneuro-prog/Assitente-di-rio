@@ -162,7 +162,7 @@ export default function App() {
             setMessages([{
               id: 'welcome',
               role: 'model',
-              content: "Bom dia! Sou o seu Tempo Amigo. O que temos para hoje? Pode me contar tudo o que você lembra, sem pressa e sem ordem.",
+              content: "Bom dia! Sou o Organiza.ai. O que temos para hoje? Pode me contar tudo o que você lembra, sem pressa e sem ordem.",
               timestamp: Date.now()
             }]);
             setView('chat');
@@ -367,7 +367,7 @@ export default function App() {
             </motion.div>
             
             <h1 className="text-5xl font-display font-black text-slate-900 mb-4 tracking-tight leading-none">
-              Tempo <br /> <span className="text-brand-500 italic">Amigo</span>
+              Organiza <br /> <span className="text-brand-500 italic">.ai</span>
             </h1>
             <div className="w-12 h-1 bg-brand-500 mx-auto mb-6 rounded-full" />
             <p className="text-slate-500 text-lg font-medium leading-relaxed px-4">

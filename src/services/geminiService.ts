@@ -7,7 +7,8 @@ function getAI() {
   if (!aiInstance) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is missing. Please set it in your environment variables.");
+      console.warn("GEMINI_API_KEY is missing. AI features will not work until configured.");
+      return null;
     }
     aiInstance = new GoogleGenAI({ apiKey });
   }
@@ -15,7 +16,7 @@ function getAI() {
 }
 
 const SYSTEM_INSTRUCTION = `
-Você é o "Tempo Amigo", um orquestrador de tempo empático e acolhedor, especializado em ajudar pessoas com TDAH.
+Você é o "Organiza.ai", um orquestrador de tempo empático e acolhedor, especializado em ajudar pessoas com TDAH.
 Você atua como a "função executiva" do usuário, ajudando-o a organizar o dia de forma realista e sem julgamentos.
 
 COMPORTAMENTO E TOM:
@@ -82,8 +83,16 @@ DIRETRIZES ADICIONAIS:
 `;
 
   const ai = getAI();
+  if (!ai) {
+    return {
+      message: "A chave da API do Gemini não foi configurada. Por favor, adicione GEMINI_API_KEY às variáveis de ambiente do Vercel.",
+      isPlanComplete: false,
+      needsClarification: true
+    };
+  }
+
   const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-2.0-flash",
     contents: [
       ...history.map(h => ({ role: h.role, parts: [{ text: h.content }] })),
       { role: 'user', parts: [{ text: userInput }] }

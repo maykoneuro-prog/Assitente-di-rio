@@ -1,5 +1,5 @@
 {
-  "name": "Tempo Amigo",
+  "name": "Organiza.ai",
   "description": "Assistente diário inteligente para orquestração de tempo, focado em TDAH e organização pessoal.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": []
