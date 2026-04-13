@@ -56,7 +56,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ milestone, onToggle }) => {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <h3 className={`font-semibold truncate ${isCompleted ? 'line-through text-slate-500' : 'text-slate-800'}`}>
+          <h3 className={`font-display text-lg font-bold truncate ${isCompleted ? 'line-through text-slate-400' : 'text-slate-800'}`}>
             {milestone.title}
           </h3>
           <span className="text-xs font-mono font-medium text-slate-500 whitespace-nowrap">

@@ -8,13 +8,13 @@
   "theme_color": "#6366f1",
   "icons": [
     {
-      "src": "https://picsum.photos/seed/tempoamigo/192/192",
+      "src": "https://picsum.photos/seed/zen-time/192/192",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://picsum.photos/seed/tempoamigo/512/512",
+      "src": "https://picsum.photos/seed/zen-time/512/512",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

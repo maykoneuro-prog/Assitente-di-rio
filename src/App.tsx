@@ -318,26 +318,62 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-brand-50 to-white">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white relative overflow-hidden">
+        {/* Background Decorative Elements */}
+        <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-brand-50 rounded-full blur-3xl opacity-60" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-80 h-80 bg-brand-100 rounded-full blur-3xl opacity-40" />
+        
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center max-w-sm"
+          className="text-center max-w-sm relative z-10"
         >
-          <div className="w-20 h-20 bg-brand-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-200">
-            <Sparkles className="w-10 h-10 text-white" />
+          <div className="mb-12">
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="w-24 h-24 bg-brand-500 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-brand-200"
+            >
+              <Sparkles className="w-12 h-12 text-white" />
+            </motion.div>
+            
+            <h1 className="text-5xl font-display font-black text-slate-900 mb-4 tracking-tight leading-none">
+              Tempo <br /> <span className="text-brand-500 italic">Amigo</span>
+            </h1>
+            <div className="w-12 h-1 bg-brand-500 mx-auto mb-6 rounded-full" />
+            <p className="text-slate-500 text-lg font-medium leading-relaxed px-4">
+              Seu orquestrador de tempo inteligente para um dia com mais <span className="text-slate-900">foco</span> e menos <span className="text-slate-900">estresse</span>.
+            </p>
           </div>
-          <h1 className="text-4xl font-display font-bold text-slate-900 mb-4">Tempo Amigo</h1>
-          <p className="text-slate-600 mb-8 leading-relaxed">
-            Seu assistente pessoal para um dia mais calmo, organizado e produtivo.
-          </p>
-          <button
-            onClick={handleLogin}
-            className="w-full py-4 bg-white border border-slate-200 rounded-2xl font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-3"
-          >
-            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-            Entrar com Google
-          </button>
+
+          <div className="space-y-4">
+            <button
+              onClick={handleLogin}
+              className="w-full py-4 bg-brand-500 text-white rounded-2xl font-bold shadow-lg shadow-brand-200 hover:bg-brand-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+            >
+              <img src="https://www.google.com/favicon.ico" className="w-5 h-5 brightness-0 invert" alt="Google" />
+              Começar agora
+            </button>
+            <p className="text-xs text-slate-400 font-medium uppercase tracking-widest">
+              Focado em TDAH & Organização
+            </p>
+          </div>
+        </motion.div>
+
+        {/* Bottom Decorative Image */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.4 }}
+          className="mt-16 w-full max-w-[280px] aspect-square rounded-[3rem] overflow-hidden border-8 border-slate-50 shadow-inner"
+        >
+          <img 
+            src="https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&q=80&w=800" 
+            className="w-full h-full object-cover grayscale-[20%] hover:grayscale-0 transition-all duration-700"
+            alt="Peaceful morning"
+            referrerPolicy="no-referrer"
+          />
         </motion.div>
       </div>
     );
@@ -359,24 +395,26 @@ export default function App() {
       {/* Header */}
       <header className="p-6 pb-4 glass sticky top-0 z-30 flex items-center justify-between">
         <div>
-          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
           </h2>
-          <h1 className="text-2xl font-bold text-slate-800">Olá, {user.displayName?.split(' ')[0]}!</h1>
+          <h1 className="text-3xl font-display font-black text-slate-900">
+            Olá, <span className="text-brand-500">{user.displayName?.split(' ')[0]}</span>
+          </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button 
             onClick={() => setIsEditingProfile(true)}
-            className="p-2 text-slate-400 hover:text-brand-500 transition-colors"
+            className="p-2 text-slate-400 hover:text-brand-500 transition-colors bg-slate-50 rounded-xl"
             title="Configurações de Perfil"
           >
             <Settings className="w-5 h-5" />
           </button>
-          <div className="bg-brand-100 text-brand-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+          <div className="bg-brand-50 text-brand-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 border border-brand-100">
             <Trophy className="w-3 h-3" />
             {profile?.stats.points || 0} pts
           </div>
-          <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
+          <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors bg-slate-50 rounded-xl">
             <LogOut className="w-5 h-5" />
           </button>
         </div>

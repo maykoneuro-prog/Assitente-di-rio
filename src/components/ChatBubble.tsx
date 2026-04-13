@@ -16,13 +16,13 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, role }) => {
       className={`flex ${isModel ? 'justify-start' : 'justify-end'} mb-4`}
     >
       <div
-        className={`max-w-[85%] p-4 rounded-2xl shadow-sm ${
+        className={`max-w-[85%] p-4 rounded-[1.5rem] shadow-sm ${
           isModel
-            ? 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
-            : 'bg-brand-500 text-white rounded-tr-none'
+            ? 'bg-white text-slate-700 rounded-tl-none border border-slate-100'
+            : 'bg-brand-500 text-white rounded-tr-none shadow-brand-100'
         }`}
       >
-        <p className="text-sm leading-relaxed">{message}</p>
+        <p className="text-[15px] leading-relaxed font-medium">{message}</p>
       </div>
     </motion.div>
   );

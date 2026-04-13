@@ -71,14 +71,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isProcessing }) =>
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyPress}
             placeholder="Digite seus planos ou use a voz..."
-            className="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all resize-none min-h-[48px] max-h-32 no-scrollbar"
+            className="w-full bg-white border border-slate-200 rounded-[1.5rem] py-4 px-5 pr-14 text-[15px] focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all resize-none min-h-[56px] max-h-32 no-scrollbar shadow-sm"
             rows={1}
             disabled={isProcessing || isListening}
           />
           <button
             onClick={handleSend}
             disabled={!inputText.trim() || isProcessing || isListening}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-brand-500 hover:bg-brand-50 rounded-xl transition-colors disabled:opacity-30"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-brand-500 hover:bg-brand-50 rounded-xl transition-colors disabled:opacity-30"
           >
             <Send className="w-5 h-5" />
           </button>
@@ -87,11 +87,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isProcessing }) =>
         <button
           onClick={toggleListening}
           disabled={isProcessing}
-          className={`p-3 rounded-2xl transition-all shadow-sm ${
+          className={`p-4 rounded-[1.5rem] transition-all shadow-lg ${
             isListening 
-              ? 'bg-red-500 text-white shadow-red-200' 
+              ? 'bg-red-500 text-white shadow-red-100' 
               : 'bg-brand-500 text-white shadow-brand-100 hover:bg-brand-600'
-          } disabled:opacity-50`}
+          } disabled:opacity-50 relative`}
         >
           {isProcessing ? (
             <Loader2 className="w-5 h-5 animate-spin" />

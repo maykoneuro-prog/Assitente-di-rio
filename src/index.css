@@ -1,14 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Outfit", sans-serif;
+  --font-display: "Playfair Display", serif;
   
-  --color-brand-50: #f0fdf4;
-  --color-brand-100: #dcfce7;
-  --color-brand-500: #22c55e;
-  --color-brand-600: #16a34a;
+  --color-brand-50: #f5f7ff;
+  --color-brand-100: #ebf0fe;
+  --color-brand-200: #ced9fd;
+  --color-brand-300: #a1b8fa;
+  --color-brand-400: #6e8ef5;
+  --color-brand-500: #4f6ef7;
+  --color-brand-600: #3b4ed9;
+  --color-brand-700: #313eb3;
+  --color-brand-800: #2d3591;
+  --color-brand-900: #293073;
+  --color-brand-950: #181c44;
   
   --color-accent-50: #fff7ed;
   --color-accent-500: #f97316;
@@ -16,7 +23,8 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased font-sans;
+    @apply bg-slate-50 text-slate-900 antialiased font-sans selection:bg-brand-100 selection:text-brand-900;
+    -webkit-tap-highlight-color: transparent;
   }
   
   h1, h2, h3, h4 {
@@ -25,7 +33,7 @@
 }
 
 .glass {
-  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-sm;
+  @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-sm;
 }
 
 .adhd-focus-ring {
