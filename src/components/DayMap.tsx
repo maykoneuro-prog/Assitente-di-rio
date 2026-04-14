@@ -2,7 +2,12 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Milestone } from '../types';
 import { format, parseISO, differenceInMinutes, startOfDay, endOfDay, isAfter, isBefore } from 'date-fns';
+import { toPng } from 'html-to-image';
 import { 
+  Share2, 
+  Download, 
+  Instagram, 
+  Award,
   Mountain, 
   Waves, 
   Trees, 
@@ -12,7 +17,8 @@ import {
   Navigation, 
   CheckCircle2, 
   Clock,
-  Compass
+  Compass,
+  Loader2
 } from 'lucide-react';
 
 interface DayMapProps {
@@ -87,6 +93,42 @@ export const DayMap: React.FC<DayMapProps> = ({ milestones, onToggleMilestone })
     return sortedMilestones.find(m => m.status !== 'completed' && isAfter(parseISO(m.endTime), now));
   }, [sortedMilestones, now]);
 
+  const isDayComplete = useMemo(() => {
+    return sortedMilestones.length > 0 && sortedMilestones.every(m => m.status === 'completed');
+  }, [sortedMilestones]);
+
+  const [isSharing, setIsSharing] = useState(false);
+  const badgeRef = React.useRef<HTMLDivElement>(null);
+
+  const handleShareBadge = async () => {
+    if (!badgeRef.current) return;
+    setIsSharing(true);
+    try {
+      const dataUrl = await toPng(badgeRef.current, { quality: 0.95, backgroundColor: '#f8fafc' });
+      
+      // On mobile, try to use the native share API
+      if (navigator.share) {
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], 'conquista-organiza-ai.png', { type: 'image/png' });
+        await navigator.share({
+          files: [file],
+          title: 'Minha Conquista no Organiza.ai',
+          text: 'Concluí todos os meus objetivos de hoje! 🚀 #OrganizaAI #Foco #Produtividade',
+        });
+      } else {
+        // Fallback: Download the image
+        const link = document.createElement('a');
+        link.download = 'conquista-organiza-ai.png';
+        link.href = dataUrl;
+        link.click();
+      }
+    } catch (err) {
+      console.error('Erro ao gerar badge:', err);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-sky-50/30 rounded-[2.5rem] overflow-hidden relative">
       {/* Background clouds or patterns could go here */}
@@ -130,7 +172,55 @@ export const DayMap: React.FC<DayMapProps> = ({ milestones, onToggleMilestone })
 
       {/* Map Content */}
       <div className="flex-1 overflow-y-auto no-scrollbar p-8 relative z-10">
-        {sortedMilestones.length === 0 ? (
+        {isDayComplete ? (
+          <div className="h-full flex flex-col items-center justify-center text-center space-y-8 py-12">
+            <div ref={badgeRef} className="p-8 bg-white rounded-[3rem] shadow-2xl border-8 border-brand-50 relative overflow-hidden max-w-[300px]">
+              <div className="absolute inset-0 bg-gradient-to-br from-brand-500/5 to-emerald-500/5" />
+              <motion.div 
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="relative z-10"
+              >
+                <div className="w-24 h-24 bg-brand-500 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-200">
+                  <Award className="w-12 h-12 text-white" />
+                </div>
+                <h3 className="text-2xl font-display font-black text-slate-900 mb-2">Missão Cumprida!</h3>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Arquipélago Conquistado</p>
+                <div className="flex items-center justify-center gap-2 text-brand-600 font-black text-sm bg-brand-50 py-2 px-4 rounded-2xl">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {sortedMilestones.length} Tarefas Concluídas
+                </div>
+                <div className="mt-6 pt-6 border-t border-slate-100">
+                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">Organiza.ai</p>
+                </div>
+              </motion.div>
+            </div>
+
+            <div className="space-y-4 px-6 w-full">
+              <h4 className="text-xl font-display font-black text-slate-800">Você dominou o seu dia!</h4>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                Todas as ilhas foram visitadas e os objetivos alcançados. Que tal compartilhar sua vitória?
+              </p>
+              
+              <div className="flex flex-col gap-3 pt-4">
+                <button
+                  onClick={handleShareBadge}
+                  disabled={isSharing}
+                  className="w-full py-4 bg-brand-500 text-white rounded-2xl font-bold shadow-lg shadow-brand-200 flex items-center justify-center gap-3 hover:bg-brand-600 transition-all active:scale-95"
+                >
+                  {isSharing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Instagram className="w-5 h-5" />}
+                  Postar no Instagram
+                </button>
+                <button
+                  onClick={() => onToggleMilestone(sortedMilestones[sortedMilestones.length - 1].id)}
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600 py-2"
+                >
+                  Ver meu mapa novamente
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : sortedMilestones.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center space-y-6">
             <motion.div 
               animate={{ y: [0, -10, 0] }}

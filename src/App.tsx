@@ -44,6 +44,57 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { SettingsModal } from './components/SettingsModal';
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -243,21 +294,31 @@ export default function App() {
 
         if (!planId) {
           console.log("Creating new plan for today:", today);
-          const newPlanRef = await addDoc(collection(db, 'plans'), {
-            userId: user.uid,
-            date: today,
-            status: 'draft',
-            createdAt: serverTimestamp()
-          });
+          const plansRef = collection(db, 'plans');
+          const newPlanRef = doc(plansRef);
           planId = newPlanRef.id;
-          await updateDoc(newPlanRef, { id: planId });
+          try {
+            await setDoc(newPlanRef, {
+              id: planId,
+              userId: user.uid,
+              date: today,
+              status: 'draft',
+              createdAt: serverTimestamp()
+            });
+          } catch (err) {
+            handleFirestoreError(err, OperationType.WRITE, `plans/${planId}`);
+          }
         } else {
           console.log("Updating existing plan:", planId);
           // If plan exists, clean up old milestones to avoid duplicates
           const oldMilestonesRef = collection(db, 'plans', planId, 'milestones');
-          const oldSnap = await getDocs(oldMilestonesRef);
-          const deletePromises = oldSnap.docs.map(d => deleteDoc(d.ref));
-          await Promise.all(deletePromises);
+          try {
+            const oldSnap = await getDocs(oldMilestonesRef);
+            const deletePromises = oldSnap.docs.map(d => deleteDoc(d.ref));
+            await Promise.all(deletePromises);
+          } catch (err) {
+            handleFirestoreError(err, OperationType.DELETE, `plans/${planId}/milestones`);
+          }
         }
 
         // Add milestones
@@ -277,7 +338,11 @@ export default function App() {
             isActionable: true,
             order: milestones.length
           };
-          await setDoc(newMRef, newMilestone);
+          try {
+            await setDoc(newMRef, newMilestone);
+          } catch (err) {
+            handleFirestoreError(err, OperationType.WRITE, `plans/${planId}/milestones/${newMRef.id}`);
+          }
         }
         
         console.log("Successfully added milestones to plan:", planId);
@@ -314,9 +379,12 @@ export default function App() {
     
     // Persist user message
     const userMsgRef = doc(db, 'users', user.uid, 'messages', userMsg.id);
-    await setDoc(userMsgRef, userMsg);
+    try {
+      await setDoc(userMsgRef, userMsg);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/messages/${userMsg.id}`);
+    }
     
-    setMessages(prev => [...prev, userMsg]);
     setView('chat');
 
     try {
@@ -332,9 +400,11 @@ export default function App() {
       
       // Persist model message
       const modelMsgRef = doc(db, 'users', user.uid, 'messages', modelMsg.id);
-      await setDoc(modelMsgRef, modelMsg);
-      
-      setMessages(prev => [...prev, modelMsg]);
+      try {
+        await setDoc(modelMsgRef, modelMsg);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/messages/${modelMsg.id}`);
+      }
 
       // Handle New Routine Learning
       if (response.newRoutine && response.newRoutine.title) {
@@ -399,10 +469,14 @@ export default function App() {
     setIsProcessing(true);
     try {
       const pRef = doc(db, 'users', user.uid);
-      await updateDoc(pRef, { 
-        settings,
-        'settings.onboardingCompleted': true 
-      });
+      try {
+        await updateDoc(pRef, { 
+          settings,
+          'settings.onboardingCompleted': true 
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
+      }
       
       const updatedProfile = profile ? { 
         ...profile, 
